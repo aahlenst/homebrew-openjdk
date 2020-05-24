@@ -1,0 +1,7 @@
+# adoptopenjdk is defined in https://github.com/Homebrew/homebrew-cask
+adoptopenjdk-jre
+adoptopenjdk-openj9
+adoptopenjdk-openj9-jre
+adoptopenjdk-openj9-large
+adoptopenjdk-openj9-jre-large
+# Leave this blank line

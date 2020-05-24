@@ -152,6 +152,80 @@ function update_casks {
       esac
     fi
   done
+
+  cd -
+}
+
+function update_aliases {
+  cd Aliases
+
+  if [ "$PUSH" == "true" ]; then
+    git fetch --all
+    git reset --hard upstream/master
+  fi
+
+  cat ../aliases.txt | while read alias 
+  do
+    # Skip comments
+    [[ "$alias" == \#* ]] && continue
+    
+    echo "Checking $alias"
+    case $alias in
+      *openj9*) jvm_impl="openj9" ;;
+      *) jvm_impl="hotspot" ;;
+    esac
+
+    case $alias in
+      *jre*) type="jre" ;;
+      *) type="jdk" ;;
+    esac
+
+    case $alias in
+      *large) heap="large" ;;
+      *) heap="normal" ;;
+    esac
+
+    api_release_info=$(curl --silent https://api.adoptopenjdk.net/v3/info/available_releases)
+    version=$(echo $api_release_info | python3 -c "import sys, json; print(json.load(sys.stdin)['most_recent_feature_release'])")
+
+    cask_file="../Casks/adoptopenjdk$version"
+    if [ "$jvm_impl" == "openj9" ]; then
+      cask_file+="-openj9"
+    fi
+    
+    if [ "$type" == "jre" ]; then
+      cask_file+="-jre"
+    fi
+
+    if [ "$heap" == "large" ]; then
+      cask_file+="-large"
+    fi
+    cask_file+=".rb"
+
+    if [[ ! -f "$cask_file" ]] && [[ ! -L $alias ]]; then
+      echo "Cask $cask_file does not exist"
+      continue
+    fi
+    
+    if [[ ! -f "$cask_file" ]]; then
+      echo "Cask $cask_file does not exist, removing alias: $alias"
+      rm "$alias"
+    fi
+
+    if [[ ! -L $alias ]]; then
+      echo "Creating new alias: $alias"
+      ln -s "$cask_file" "$alias"
+    fi
+
+    if [ "$PUSH" == "true" ]; then
+      git add $cask.rb
+      git commit -m "update $cask to $api_version"
+      git push -f fork "$version-$jvm_impl-$type-$heap"
+      hub pull-request --base adoptopenjdk:master --head "$version-$jvm_impl-$type-$heap" -m "update $alias to $version"
+    fi
+  done
+
+  cd -
 }
 
 if [ "$PUSH" == "true" ]; then
@@ -160,5 +234,5 @@ if [ "$PUSH" == "true" ]; then
 fi
 
 update_casks
+update_aliases
 
-cd -
